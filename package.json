@@ -1,0 +1,52 @@
+{
+  "name": "regex-test-preview",
+  "displayName": "Regex Test Preview",
+  "description": "A VSCode extension for testing and previewing regular expressions with real-time highlighting",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "regex",
+    "regular expression",
+    "test",
+    "preview",
+    "highlight"
+  ],
+  "activationEvents": [
+    "onCommand:regex-test-preview.open"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "regex-test-preview.open",
+        "title": "Open Regex Test Preview",
+        "category": "Regex Test Preview"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "npx vsce package",
+    "publish": "npx vsce publish"
+  },
+  "devDependencies": {
+    "@types/node": "16.x",
+    "@types/vscode": "^1.74.0",
+    "@typescript-eslint/eslint-plugin": "^5.45.0",
+    "@typescript-eslint/parser": "^5.45.0",
+    "@vscode/vsce": "^3.6.2",
+    "eslint": "^8.28.0",
+    "typescript": "^4.9.4"
+  }
+}
