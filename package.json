@@ -3,6 +3,11 @@
   "displayName": "Regex Test Preview",
   "description": "A VSCode extension for testing and previewing regular expressions with real-time highlighting",
   "version": "0.0.1",
+  "publisher": "qinxiao",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/000long/RegexTestPreview.git"
+  },
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -40,6 +45,11 @@
     "package": "npx vsce package",
     "publish": "npx vsce publish"
   },
+  "homepage": "https://github.com/000long/RegexTestPreview#readme",
+  "bugs": {
+    "url": "https://github.com/000long/RegexTestPreview/issues"
+  },
+  "license": "MIT",
   "devDependencies": {
     "@types/node": "16.x",
     "@types/vscode": "^1.74.0",
