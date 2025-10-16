@@ -210,7 +210,7 @@ function getWebviewContent(): string {
             <label for="testText">Test Text:</label>
             <div class="editor-container">
                 <canvas id="highlightCanvas" class="canvas-background"></canvas>
-                <textarea id="testText" class="test-text" placeholder="Enter text to test against the regex...">Hello World! This is a test. Test 123 456 789.</textarea>
+                <textarea id="testText" class="test-text" placeholder="Enter text to test against the regex..."></textarea>
             </div>
         </div>
 
@@ -479,8 +479,6 @@ function getWebviewContent(): string {
 
         // Initialize on load
         window.addEventListener('load', () => {
-            testTextArea.value = 'Hello World! This is a test. Test 123 456 789.';
-
             // Setup canvas after a brief delay to ensure proper sizing
             setTimeout(() => {
                 setupCanvas();
