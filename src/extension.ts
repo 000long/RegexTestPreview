@@ -1,9 +1,8 @@
 import * as vscode from 'vscode';
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('Regex Test Preview extension is now active!');
-
     let disposable = vscode.commands.registerCommand('regex-test-preview.open', () => {
+
         const panel = vscode.window.createWebviewPanel(
             'regexTestPreview',
             'Regex Test Preview',
@@ -14,24 +13,20 @@ export function activate(context: vscode.ExtensionContext) {
             }
         );
 
-        panel.webview.html = getWebviewContent();
+        panel.webview.html = getSimpleHTML();
 
-        // Handle messages from the webview
         panel.webview.onDidReceiveMessage(
             message => {
-                switch (message.command) {
-                    case 'testRegex':
-                        try {
-                            const matches = testRegex(message.pattern, message.text, message.flags);
-                            panel.webview.postMessage({ command: 'showMatches', matches: matches });
-                        } catch (error) {
-                            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                            panel.webview.postMessage({
-                                command: 'showError',
-                                error: errorMessage
-                            });
-                        }
-                        return;
+                if (message.command === 'testRegex') {
+                    try {
+                        const matches = testRegex(message.pattern, message.text, message.flags);
+                        panel.webview.postMessage({ command: 'showMatches', matches: matches });
+                    } catch (error) {
+                        panel.webview.postMessage({
+                            command: 'showError',
+                            error: error instanceof Error ? error.message : 'Unknown error'
+                        });
+                    }
                 }
             },
             undefined,
@@ -59,7 +54,6 @@ function testRegex(pattern: string, text: string, flags: string): Array<{start: 
                 text: match[0]
             });
 
-            // Avoid infinite loops with zero-length matches
             if (match.index === regex.lastIndex) {
                 regex.lastIndex++;
             }
@@ -67,17 +61,15 @@ function testRegex(pattern: string, text: string, flags: string): Array<{start: 
 
         return matches;
     } catch (error) {
-        console.error('Invalid regex pattern:', error);
         throw error;
     }
 }
 
-function getWebviewContent(): string {
+function getSimpleHTML(): string {
     return `<!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Regex Test Preview</title>
     <style>
         body {
@@ -87,32 +79,27 @@ function getWebviewContent(): string {
             margin: 0;
             padding: 20px;
         }
-
         .container {
             max-width: 100%;
             height: calc(100vh - 40px);
             display: flex;
             flex-direction: column;
         }
-
         .input-group {
             margin-bottom: 15px;
         }
-
         label {
             display: block;
             margin-bottom: 5px;
             font-weight: bold;
-            color: #ffffff;
+            color: #fff;
         }
-
         .regex-input-row {
             display: flex;
             gap: 10px;
             align-items: center;
             margin-bottom: 15px;
         }
-
         .regex-input, .flags-input {
             padding: 8px 12px;
             border: 1px solid #3c3c3c;
@@ -123,24 +110,20 @@ function getWebviewContent(): string {
             border-radius: 3px;
             box-sizing: border-box;
         }
-
         .regex-input {
             flex: 1;
             height: 32px;
         }
-
         .flags-input {
             width: 80px;
             height: 32px;
             flex-shrink: 0;
         }
-
         .regex-input:focus, .flags-input:focus {
             outline: none;
             border-color: #0078d4;
-            box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.2);
+            box-shadow: 0 0 0 2px rgba(0,120,212,0.2);
         }
-
         .editor-container {
             flex: 1;
             display: flex;
@@ -151,20 +134,9 @@ function getWebviewContent(): string {
             min-height: 300px;
             position: relative;
         }
-
-        .canvas-background {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 1;
-        }
-
-        .test-text {
+        #textEditor {
             position: relative;
-            z-index: 2;
+            z-index: 1;
             width: 100%;
             flex: 1;
             resize: none;
@@ -175,18 +147,27 @@ function getWebviewContent(): string {
             border: none;
             background: transparent;
             color: #d4d4d4;
-            font-family: 'Consolas', 'Monaco', monospace;
+            font-family: 'Consolas', 'Microsoft YaHei', 'SimHei', monospace;
             font-size: 14px;
             box-sizing: border-box;
             outline: none;
+            overflow-y: auto;
         }
-
+        #textEditor:focus {
+            outline: none;
+        }
+        .highlight {
+            background-color: yellow;
+            color: black;
+            font-weight: bold;
+            border-radius: 2px;
+            padding: 0 2px;
+        }
         .error {
             color: #f48771;
             font-size: 12px;
             margin-top: 5px;
         }
-
         .status {
             margin-top: 10px;
             font-size: 12px;
@@ -199,214 +180,44 @@ function getWebviewContent(): string {
         <h1>Regex Test Preview</h1>
 
         <div class="input-group">
-            <label for="regex">Regular Expression:</label>
+            <label for="pattern">Regular Expression:</label>
             <div class="regex-input-row">
-                <input type="text" id="regex" class="regex-input" placeholder="Enter regex pattern..." value="">
+                <input type="text" id="pattern" class="regex-input" placeholder="Enter regex pattern..." value="">
                 <input type="text" id="flags" class="flags-input" placeholder="flags" value="g">
             </div>
         </div>
 
         <div class="input-group">
-            <label for="testText">Test Text:</label>
+            <label for="textEditor">Test Text:</label>
             <div class="editor-container">
-                <canvas id="highlightCanvas" class="canvas-background"></canvas>
-                <textarea id="testText" class="test-text" placeholder="Enter text to test against the regex..."></textarea>
+                <div id="textEditor" contenteditable="true" spellcheck="false" placeholder="Enter text to test against the regex..."></div>
             </div>
         </div>
 
-        <div id="error" class="error" style="display: none;"></div>
         <div id="status" class="status">Ready to test regex</div>
     </div>
 
     <script>
         const vscode = acquireVsCodeApi();
-        let debounceTimer;
-        let currentMatches = [];
-
-        // Get elements
-        const regexInput = document.getElementById('regex');
+        const patternInput = document.getElementById('pattern');
         const flagsInput = document.getElementById('flags');
-        const testTextArea = document.getElementById('testText');
-        const highlightCanvas = document.getElementById('highlightCanvas');
-        const ctx = highlightCanvas.getContext('2d');
-        const errorDiv = document.getElementById('error');
+        const textEditor = document.getElementById('textEditor');
         const statusDiv = document.getElementById('status');
 
-        // Text measurement cache for performance
-        const textMetricsCache = new Map();
+        let currentText = '';
+        let currentMatches = [];
 
-        // Get accurate text measurements
-        function getTextMetrics(text) {
-            if (!textMetricsCache.has(text)) {
-                ctx.font = '14px Consolas, Monaco, monospace';
-                const metrics = ctx.measureText(text);
-                textMetricsCache.set(text, metrics);
-
-                // Clear cache if it gets too large
-                if (textMetricsCache.size > 1000) {
-                    textMetricsCache.clear();
-                }
-            }
-            return textMetricsCache.get(text);
+        function getPlainContent(element) {
+            return element.innerText || element.textContent || '';
         }
 
-        // Canvas setup and text metrics
-        function setupCanvas() {
-            const computedStyle = window.getComputedStyle(testTextArea);
-            const rect = testTextArea.getBoundingClientRect();
-
-            // Set canvas size to match textarea with device pixel ratio for sharp rendering
-            const dpr = window.devicePixelRatio || 1;
-            highlightCanvas.width = rect.width * dpr;
-            highlightCanvas.height = rect.height * dpr;
-            highlightCanvas.style.width = rect.width + 'px';
-            highlightCanvas.style.height = rect.height + 'px';
-
-            // Scale context for sharp rendering
-            ctx.scale(dpr, dpr);
-
-            // Set font to match textarea
-            ctx.font = '14px Consolas, Monaco, monospace';
-            ctx.textBaseline = 'alphabetic';
-
-            // Clear canvas
-            ctx.clearRect(0, 0, rect.width, rect.height);
-        }
-
-        // Calculate accurate text position using measurements
-        function getTextPosition(text, index) {
-            const lines = text.substring(0, index).split('\\n');
-            const currentLine = lines.length - 1;
-            const lineText = lines[lines.length - 1];
-
-            // Measure actual text width
-            const textMetrics = getTextMetrics(lineText);
-            const textWidth = textMetrics.width;
-
-            const fontSize = 14;
-            const lineHeight = 21; // 1.5 * font-size
-            const padding = 12; // 12px padding
-
-            return {
-                x: textWidth + padding,
-                y: currentLine * lineHeight + lineHeight - 2 // Adjust for better alignment
-            };
-        }
-
-        // Get text width for a specific range
-        function getTextWidth(text, start, end) {
-            const substring = text.substring(start, end);
-            const metrics = getTextMetrics(substring);
-            return metrics.width;
-        }
-
-        // Draw highlights on canvas with improved accuracy
-        function drawHighlights(matches, text) {
-            if (!matches || matches.length === 0) {
-                ctx.clearRect(0, 0, highlightCanvas.width, highlightCanvas.height);
-                return;
-            }
-
-            // Clear canvas
-            const rect = testTextArea.getBoundingClientRect();
-            ctx.clearRect(0, 0, rect.width, rect.height);
-
-            // Set highlight style
-            ctx.fillStyle = 'rgba(38, 79, 120, 0.6)';
-
-            // Group matches by line for better rendering
-            const matchesByLine = new Map();
-
-            matches.forEach(match => {
-                if (typeof match.start === 'number' &&
-                    typeof match.end === 'number' &&
-                    typeof match.text === 'string') {
-
-                    try {
-                        const startLines = text.substring(0, match.start).split('\\n');
-                        const endLines = text.substring(0, match.end).split('\\n');
-                        const startLine = startLines.length - 1;
-                        const endLine = endLines.length - 1;
-
-                        if (!matchesByLine.has(startLine)) {
-                            matchesByLine.set(startLine, []);
-                        }
-
-                        matchesByLine.get(startLine).push({
-                            start: match.start,
-                            end: match.end,
-                            text: match.text,
-                            startLine: startLine,
-                            endLine: endLine,
-                            startColumn: startLines[startLines.length - 1].length,
-                            endColumn: endLines[endLines.length - 1].length
-                        });
-                    } catch (error) {
-                        console.error('Error processing match:', error);
-                    }
-                }
-            });
-
-            // Draw highlights line by line
-            const fontSize = 14;
-            const lineHeight = 21;
-            const padding = 12;
-
-            matchesByLine.forEach((lineMatches, lineNumber) => {
-                lineMatches.forEach(match => {
-                    const startPos = getTextPosition(text, match.start);
-
-                    if (match.startLine === match.endLine) {
-                        // Single line match
-                        const matchWidth = getTextWidth(text, match.start, match.end);
-
-                        ctx.beginPath();
-                        ctx.roundRect(
-                            startPos.x,
-                            startPos.y - lineHeight + 3,
-                            matchWidth,
-                            lineHeight - 1,
-                            2
-                        );
-                        ctx.fill();
-                    } else {
-                        // Multi-line match - draw from start to end of line
-                        const lineText = text.split('\\n')[match.startLine];
-                        const endOfLineWidth = getTextWidth(lineText, 0, lineText.length);
-
-                        ctx.beginPath();
-                        ctx.roundRect(
-                            startPos.x,
-                            startPos.y - lineHeight + 3,
-                            endOfLineWidth - getTextWidth(lineText, 0, match.startColumn),
-                            lineHeight - 1,
-                            2
-                        );
-                        ctx.fill();
-                    }
-                });
-            });
-        }
-
-        // Debounce function
-        function debounce(func, wait) {
-            return function executedFunction(...args) {
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(() => func.apply(this, args), wait);
-            };
-        }
-
-        // Test regex and update highlights
         function testRegex() {
-            const pattern = regexInput.value;
+            const pattern = patternInput.value;
             const flags = flagsInput.value;
-            const text = testTextArea.value;
+            currentText = getPlainContent(textEditor);
 
-            errorDiv.style.display = 'none';
-
-            if (!pattern || pattern.trim() === '') {
-                statusDiv.textContent = 'Ready to test regex';
-                ctx.clearRect(0, 0, highlightCanvas.width, highlightCanvas.height);
+            if (!pattern) {
+                statusDiv.textContent = 'Please enter a regex pattern';
                 return;
             }
 
@@ -415,92 +226,133 @@ function getWebviewContent(): string {
             vscode.postMessage({
                 command: 'testRegex',
                 pattern: pattern.trim(),
-                text: text,
+                text: currentText,
                 flags: flags
             });
         }
 
-        // Update matches and redraw highlights
-        function updateMatches(matches) {
-            currentMatches = matches;
-            const text = testTextArea.value;
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
 
-            setupCanvas();
-            drawHighlights(matches, text);
+        function applyHighlights(matches) {
+            if (!matches || matches.length === 0) {
+                textEditor.innerHTML = escapeHtml(currentText);
+                return;
+            }
 
-            if (matches.length === 0) {
-                statusDiv.textContent = 'No matches found';
-            } else {
-                statusDiv.textContent = \`Found \${matches.length} match(es)\`;
+            // 保存当前光标位置
+            const selection = window.getSelection();
+            const cursorOffset = getCursorOffset(textEditor);
+            const cursorNode = selection.anchorNode;
+            const cursorOffsetInNode = selection.anchorOffset;
+
+            let highlightedHTML = '';
+            let lastEnd = 0;
+
+            matches.forEach((match, index) => {
+                // 添加匹配前的文本
+                highlightedHTML += escapeHtml(currentText.substring(lastEnd, match.start));
+                // 添加高亮的匹配文本
+                highlightedHTML += '<span class="highlight">' + escapeHtml(match.text) + '</span>';
+                lastEnd = match.end;
+            });
+
+            // 添加剩余的文本
+            highlightedHTML += escapeHtml(currentText.substring(lastEnd));
+
+            textEditor.innerHTML = highlightedHTML;
+
+            // 恢复光标位置
+            setTimeout(() => {
+                setCursorPosition(textEditor, cursorOffset);
+            }, 0);
+        }
+
+        function getCursorOffset(element) {
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return 0;
+
+            const range = selection.getRangeAt(0);
+            const preCaretRange = range.cloneRange();
+            preCaretRange.selectNodeContents(element);
+            preCaretRange.setEnd(range.endContainer, range.endOffset);
+
+            const textContent = element.innerText || element.textContent || '';
+            const plainText = preCaretRange.toString();
+            return plainText.length;
+        }
+
+        function setCursorPosition(element, offset) {
+            const textContent = element.innerText || element.textContent || '';
+            const maxOffset = Math.min(offset, textContent.length);
+
+            const walker = document.createTreeWalker(
+                element,
+                NodeFilter.SHOW_TEXT,
+                null,
+                false
+            );
+
+            let currentOffset = 0;
+            let targetNode = null;
+            let targetOffset = 0;
+
+            while (walker.nextNode()) {
+                const node = walker.currentNode;
+                const nodeLength = node.textContent.length;
+
+                if (currentOffset + nodeLength >= maxOffset) {
+                    targetNode = node;
+                    targetOffset = maxOffset - currentOffset;
+                    break;
+                }
+
+                currentOffset += nodeLength;
+            }
+
+            if (targetNode) {
+                const range = document.createRange();
+                const selection = window.getSelection();
+                range.setStart(targetNode, targetOffset);
+                range.collapse(true);
+                selection.removeAllRanges();
+                selection.addRange(range);
             }
         }
 
-        // Handle resize with debouncing
-        const debouncedHandleResize = debounce(() => {
-            const text = testTextArea.value;
-            setupCanvas();
-            drawHighlights(currentMatches, text);
-        }, 100);
-
-        function handleResize() {
-            debouncedHandleResize();
-        }
-
-        // Event listeners
-        const debouncedTestRegex = debounce(testRegex, 300);
-
-        regexInput.addEventListener('input', debouncedTestRegex);
-        flagsInput.addEventListener('input', debouncedTestRegex);
-        testTextArea.addEventListener('input', debouncedTestRegex);
-
-        // Handle resize
-        window.addEventListener('resize', handleResize);
-
-        // Handle textarea scroll with synchronization
-        testTextArea.addEventListener('scroll', () => {
-            highlightCanvas.style.transform = \`translate(-\${testTextArea.scrollLeft}px, -\${testTextArea.scrollTop}px)\`;
-        });
-
-        // Handle messages from extension
         window.addEventListener('message', event => {
             const message = event.data;
 
-            switch (message.command) {
-                case 'showMatches':
-                    updateMatches(message.matches);
-                    break;
-                case 'showError':
-                    errorDiv.textContent = message.error || 'Unknown error occurred';
-                    errorDiv.style.display = 'block';
-                    statusDiv.textContent = 'Error in regex pattern';
-                    break;
+            if (message.command === 'showMatches') {
+                currentMatches = message.matches;
+                applyHighlights(currentMatches);
+                statusDiv.textContent = 'Found ' + currentMatches.length + ' match(es)';
+            } else if (message.command === 'showError') {
+                statusDiv.textContent = 'Error: ' + message.error;
             }
         });
 
-        // Initialize on load
-        window.addEventListener('load', () => {
-            // Setup canvas after a brief delay to ensure proper sizing
-            setTimeout(() => {
-                setupCanvas();
+        // 实时测试
+        patternInput.addEventListener('input', () => {
+            if (patternInput.value && currentText) {
                 testRegex();
-            }, 100);
+            }
         });
 
-        // Add roundRect polyfill if needed
-        if (!CanvasRenderingContext2D.prototype.roundRect) {
-            CanvasRenderingContext2D.prototype.roundRect = function(x, y, width, height, radius) {
-                if (width < 2 * radius) radius = width / 2;
-                if (height < 2 * radius) radius = height / 2;
-                this.beginPath();
-                this.moveTo(x + radius, y);
-                this.arcTo(x + width, y, x + width, y + height, radius);
-                this.arcTo(x + width, y + height, x, y + height, radius);
-                this.arcTo(x, y + height, x, y, radius);
-                this.arcTo(x, y, x + width, y, radius);
-                this.closePath();
-                return this;
-            };
-        }
+        textEditor.addEventListener('input', () => {
+            currentText = getPlainContent(textEditor);
+            if (patternInput.value) {
+                testRegex();
+            }
+        });
+
+        // 初始化
+        patternInput.value = '';
+        currentText = '';
+        textEditor.innerHTML = '';
     </script>
 </body>
 </html>`;
