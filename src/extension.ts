@@ -243,11 +243,15 @@ function getSimpleHTML(): string {
                 return;
             }
 
-            // 保存当前光标位置
-            const selection = window.getSelection();
-            const cursorOffset = getCursorOffset(textEditor);
-            const cursorNode = selection.anchorNode;
-            const cursorOffsetInNode = selection.anchorOffset;
+            // 检查当前焦点是否在文本编辑器中
+            const activeElement = document.activeElement;
+            const isTextEditorFocused = activeElement === textEditor;
+
+            // 保存当前光标位置（仅当焦点在文本编辑器中时）
+            let cursorOffset = 0;
+            if (isTextEditorFocused) {
+                cursorOffset = getCursorOffset(textEditor);
+            }
 
             let highlightedHTML = '';
             let lastEnd = 0;
@@ -265,10 +269,12 @@ function getSimpleHTML(): string {
 
             textEditor.innerHTML = highlightedHTML;
 
-            // 恢复光标位置
-            setTimeout(() => {
-                setCursorPosition(textEditor, cursorOffset);
-            }, 0);
+            // 恢复光标位置（仅当焦点在文本编辑器中时）
+            if (isTextEditorFocused) {
+                setTimeout(() => {
+                    setCursorPosition(textEditor, cursorOffset);
+                }, 0);
+            }
         }
 
         function getCursorOffset(element) {

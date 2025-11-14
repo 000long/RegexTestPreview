@@ -410,13 +410,211 @@ npm run publish      # 发布插件
 
 ## 📚 技术文档
 
-### Bug修复报告
-- [光标位置Bug修复报告 (v1.0.1)](./BUGFIX_CURSOR_POSITION.md)
-  - 详细记录了contenteditable光标位置错乱问题的修复过程
-  - 包含完整的代码实现和技术原理说明
-  - 适用于类似DOM重建导致光标问题的场景
+### Bug修复报告详情
+
+#### 光标位置Bug修复 (v1.0.1)
+
+##### 问题描述
+在使用contenteditable div实现实时高亮功能时，出现字符倒序显示问题：
+- 用户逐字输入文本时，字符会出现倒序显示
+- 例如：输入"14"会显示为"41"
+
+##### 根本原因分析
+1. **DOM重建导致光标丢失** - 调用`innerHTML`重新设置内容时，原有DOM节点被销毁，光标引用失效
+2. **浏览器光标行为** - contenteditable的光标基于DOM节点位置，DOM重建后光标重置到开头
+3. **高亮更新与用户输入冲突** - 实时高亮更新频率高，没有正确的同步机制
+
+##### 修复方案
+实现了完整的光标位置管理机制：
+
+```javascript
+// 保存光标位置函数
+function getCursorOffset(element) {
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return 0;
+
+    const range = selection.getRangeAt(0);
+    const preCaretRange = range.cloneRange();
+    preCaretRange.selectNodeContents(element);
+    preCaretRange.setEnd(range.endContainer, range.endOffset);
+
+    // 计算光标在纯文本中的偏移量
+    const plainText = preCaretRange.toString();
+    return plainText.length;
+}
+
+// 恢复光标位置函数
+function setCursorPosition(element, offset) {
+    const textContent = element.innerText || element.textContent || '';
+    const maxOffset = Math.min(offset, textContent.length);
+
+    // 使用TreeWalker遍历所有文本节点
+    const walker = document.createTreeWalker(
+        element,
+        NodeFilter.SHOW_TEXT,
+        null,
+        false
+    );
+
+    let currentOffset = 0;
+    let targetNode = null;
+    let targetOffset = 0;
+
+    while (walker.nextNode()) {
+        const node = walker.currentNode;
+        const nodeLength = node.textContent.length;
+
+        if (currentOffset + nodeLength >= maxOffset) {
+            targetNode = node;
+            targetOffset = maxOffset - currentOffset;
+            break;
+        }
+
+        currentOffset += nodeLength;
+    }
+
+    // 设置光标到目标位置
+    if (targetNode) {
+        const range = document.createRange();
+        const selection = window.getSelection();
+        range.setStart(targetNode, targetOffset);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+}
+```
+
+#### 长文本高亮定位Bug修复
+
+##### 问题背景
+长文本的高亮定位不准确，匹配文本的高亮位置与原文本不对应，多行文本中出现错位现象。
+
+##### 根本原因分析
+1. **Canvas方案问题** - 使用固定字符宽度（8px）不准确，中文字符宽度与英文字符不同
+2. **DOM测量方案问题** - 频繁创建/销毁DOM元素影响性能，测量结果不一致
+
+##### 最终解决方案：文本复制高亮技术
+放弃复杂的坐标计算，采用更直接的文本复制方法：
+
+```javascript
+function applyHighlights(matches) {
+    if (!matches || matches.length === 0) {
+        textEditor.innerHTML = escapeHtml(currentText);
+        return;
+    }
+
+    // 保存光标位置
+    const cursorOffset = getCursorOffset(textEditor);
+
+    // 构建高亮HTML
+    let highlightedHTML = '';
+    let lastEnd = 0;
+
+    matches.forEach((match, index) => {
+        // 添加匹配前的普通文本
+        highlightedHTML += escapeHtml(currentText.substring(lastEnd, match.start));
+        // 添加高亮的匹配文本
+        highlightedHTML += '<span class="highlight">' + escapeHtml(match.text) + '</span>';
+        lastEnd = match.end;
+    });
+
+    // 添加剩余的文本
+    highlightedHTML += escapeHtml(currentText.substring(lastEnd));
+
+    // 应用高亮
+    textEditor.innerHTML = highlightedHTML;
+
+    // 恢复光标位置
+    setTimeout(() => {
+        setCursorPosition(textEditor, cursorOffset);
+    }, 0);
+}
+```
+
+**方案优势：**
+- **精确性** - 直接基于文本位置构建HTML，避免坐标计算误差
+- **简洁性** - 代码简单易懂，维护成本低
+- **可靠性** - 不依赖复杂的DOM测量或Canvas计算
+- **性能好** - 避免频繁的DOM操作和测量
+
+#### 焦点管理Bug修复 (v1.0.2)
+
+##### 问题描述
+在Regular Expression输入框中输入时，焦点会意外转移到Test Text编辑器，导致用户输入的字符出现在错误位置。
+
+##### 根本原因分析
+`selection.addRange()` 不仅设置光标位置，还会将焦点转移到目标元素，即使用户正在输入框中编辑，也会强制焦点转移到contenteditable div。
+
+##### 修复方案：焦点感知的高亮更新
+修改高亮应用逻辑，只在必要时恢复光标位置：
+
+```javascript
+function applyHighlights(matches) {
+    if (!matches || matches.length === 0) {
+        textEditor.innerHTML = escapeHtml(currentText);
+        return;
+    }
+
+    // 检查当前焦点是否在文本编辑器中
+    const activeElement = document.activeElement;
+    const isTextEditorFocused = activeElement === textEditor;
+
+    // 保存当前光标位置（仅当焦点在文本编辑器中时）
+    let cursorOffset = 0;
+    if (isTextEditorFocused) {
+        cursorOffset = getCursorOffset(textEditor);
+    }
+
+    // ... 构建高亮HTML的代码 ...
+
+    // 应用高亮
+    textEditor.innerHTML = highlightedHTML;
+
+    // 恢复光标位置（仅当焦点在文本编辑器中时）
+    if (isTextEditorFocused) {
+        setTimeout(() => {
+            setCursorPosition(textEditor, cursorOffset);
+        }, 0);
+    }
+}
+```
+
+**关键改进：**
+- **焦点感知** - 检测当前焦点所在的控件
+- **条件性操作** - 只在必要时恢复光标位置
+- **用户体验** - 不会中断用户的输入操作
+- **智能判断** - 避免不必要的DOM操作
+
+### 核心技术要点总结
+
+#### 1. Selection和Range API
+- `window.getSelection()` - 获取当前选择对象
+- `selection.getRangeAt(0)` - 获取当前Range
+- `range.cloneRange()` - 克隆Range进行计算
+- `range.setStart/setEnd` - 设置Range边界
+
+#### 2. TreeWalker API
+- `document.createTreeWalker()` - 创建DOM遍历器
+- `NodeFilter.SHOW_TEXT` - 只遍历文本节点
+- `walker.nextNode()` - 遍历到下一个节点
+
+#### 3. 焦点管理原则
+- **最小干扰** - 尽量不改变用户的焦点状态
+- **智能判断** - 根据上下文决定是否需要操作焦点
+- **用户优先** - 用户的操作意图应该被尊重
+
+#### 4. 性能优化经验
+- **避免复杂的坐标计算** - 在Web环境中，文本位置的计算很难做到完全精确
+- **优先使用文本操作** - 直接基于字符串操作比DOM测量更可靠
+- **简单方案往往是最好的** - 复杂的解决方案通常意味着更多的潜在bug和更高的维护成本
 
 ### 版本更新日志
+#### v1.0.2 (2024-11-14)
+- 🐛 **修复**: 输入框焦点丢失问题，防止输入内容出现在错误位置
+- 🔧 **改进**: 实现焦点感知的高亮更新机制
+- 📚 **新增**: 添加焦点管理Bug修复技术文档
+
 #### v1.0.1 (2024-10-28)
 - 🐛 **修复**: contenteditable中逐字输入字符倒序显示的问题
 - 🔧 **改进**: 实现了精确的光标位置保存和恢复机制

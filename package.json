@@ -2,7 +2,7 @@
   "name": "regex-test-preview",
   "displayName": "Regex Test Preview",
   "description": "A minimal VSCode extension for testing regular expressions with real-time highlighting directly in the text",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "publisher": "qinxiao",
   "repository": {
     "type": "git",
